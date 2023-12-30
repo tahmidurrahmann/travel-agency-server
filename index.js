@@ -24,6 +24,7 @@ async function run() {
 
         const offerCollection = client.db("travelAgency").collection("offers");
         const userCollection = client.db("travelAgency").collection("users");
+        const bookingCollection = client.db("travelAgency").collection("bookings");
 
         app.get("/offers", async (req, res) => {
             const result = await offerCollection.find().toArray();
@@ -40,13 +41,44 @@ async function run() {
         app.post("/user", async (req, res) => {
             const userInfo = req?.body;
             const email = userInfo?.email;
-            const query = {email : email};
+            const query = { email: email };
             const checkRegisteredOrNot = await userCollection.findOne(query);
-            if(checkRegisteredOrNot){
-               return res.send("User Already Exists")
+            if (checkRegisteredOrNot) {
+                return res.send("User Already Exists")
             }
             const result = await userCollection.insertOne(userInfo);
             res.send(result);
+        })
+
+        app.get("/bookings", async (req, res) => {
+            const result = await bookingCollection.find().toArray();
+            res.send(result);
+        })
+
+        app.get("/bookings/:email", async (req, res) => {
+            const email = req?.params?.email;
+            const query = { userEmail: email };
+            const result = await bookingCollection.findOne(query);
+            res.send(result);
+        })
+
+        app.post("/bookingInfo", async (req, res) => {
+            const bookingInfo = req?.body;
+            const tripName = bookingInfo?.tripName;
+            const result = await bookingCollection.insertOne(bookingInfo);
+            if (result?.insertedId) {
+                const query = { tripName: tripName };
+                const tripInfo = await offerCollection.findOne(query);
+                const totalAvailability = tripInfo?.availability;
+                const filter = { tripName: tripName };
+                const updateDoc = {
+                    $set: {
+                      availability : totalAvailability - 1,
+                    },
+                  };
+                const remainingAvailability = await offerCollection.updateOne(filter,updateDoc)
+                res.send(result);
+            }
         })
 
         await client.db("admin").command({ ping: 1 });
